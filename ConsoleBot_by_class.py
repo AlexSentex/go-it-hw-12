@@ -1,9 +1,10 @@
+'''Custom Address book'''
 from collections import UserDict
 from collections.abc import Iterator
 from datetime import datetime
-from prettytable import PrettyTable
 from dataclasses import dataclass
 import pickle
+from prettytable import PrettyTable
 
 class AddressBook(UserDict):
     '''The only Address book'''
@@ -58,7 +59,7 @@ class AddressBook(UserDict):
             6: 'File not found!',
             7: PhoneExistError.__doc__
         }
-        
+
         def greet():
             return 'Hello!\nHow can I help you?'
 
@@ -93,24 +94,24 @@ class AddressBook(UserDict):
 
             birthday = Birthday()
             birthday.value = birth_value
-            
+
             rec = Record(name, phone, birthday)
             ab.add_record(rec)
             return 'Done'
 
-
-        def change(name, old_number, new_number) -> str:
+        def change(name: str, new_phone: str, new_birthday: str) -> str:
             '''Change user number'''
 
-            if name not in self.keys():
+            if name not in self.data.keys():
                 raise UsernameError
-
-            for phone in self[name].phones:
-                if phone.value == old_number:
-                    phone.value = new_number
-                    return 'Done'
-
-            raise ValueError
+            if new_phone:
+                self[name].phone.value = new_phone
+                return 'Done'
+            if new_birthday:
+                birth_value = datetime.strptime(new_birthday, '%Y-%m-%d')
+                self[name].birtday.value = birth_value
+                return 'Done'
+            return 'No value'
 
         def show(name: str) -> str:
             '''Show User phone.\n
@@ -130,8 +131,23 @@ class AddressBook(UserDict):
                     self[name].days_to_birthday()
                     ])
                 return user
-            return 'End list'    
-        
+            return 'End list'
+
+        def search(value: str):
+            result = PrettyTable()
+            result.field_names = ['Name', 'Phone', 'Days to birthday']
+
+            for record in self.data.values():
+                if value in record.name.value or\
+                   value in record.phone.value:
+                    
+                    result.add_row([
+                        record.name.value,
+                        record.phone.value,
+                        record.days_to_birthday()
+                        ])
+            return result
+
         try:
             if command == 'hello':
                 return greet()
@@ -147,8 +163,10 @@ class AddressBook(UserDict):
                 return self.load(args[0])
             elif command == 'save':
                 return self.save(args[0])
+            elif command == 'search':
+                return search(args[0])
             raise CommandError
-        
+
         except UsernameError:
             return errors[2]
         except ValueError:
@@ -210,12 +228,14 @@ class AddressBook(UserDict):
         return (command, name, number, birthday)
 
 class Record:
+    '''Contains information about contact'''
     def __init__(self, name, phone=None, birthday=None) -> None:
         self.name = name
         self.birthday = birthday
         self.phone = phone
 
     def days_to_birthday(self):
+        '''Counts days to birthday from now'''
         if self.birthday.value:
             now = datetime.now()
             birthday = self.birthday.value
@@ -227,6 +247,7 @@ class Record:
 
 
 class Field:
+    '''Main class for all fields'''
     def __init__(self) -> None:
         self.value = {}
 
@@ -259,7 +280,7 @@ class CommandError(LookupError):
 class DateError(LookupError):
     '''Unsupported date format'''    
 class PhoneExistError(LookupError):
-    '''Phone already exist, use 'change' command instead'''
+    '''Userphone already exist, use 'change' command instead'''
 
 
 def main() -> None:
@@ -275,6 +296,10 @@ def main() -> None:
             test = [
                 'add nick 15952124',
                 'add nick 1992-1-5',
+                'add nick 15952124',
+                'change nick 759214',
+
+                'change nick 1992-2-5',
                 'show all',
                 'show nick',
                 'add nancy 159648 1552-4-5',
@@ -297,7 +322,7 @@ def main() -> None:
             command = test[index]
         command = ab.parser(command.lower())
         if command == 'break':
-            ab.save()
+            ab.save(ab.filename)
             break
 
         result = ab.handler(command[0], command[1:])
